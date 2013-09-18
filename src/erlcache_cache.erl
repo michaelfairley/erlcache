@@ -3,7 +3,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, set/4, get/1, flush/0]).
+-export([start_link/0, set/4, get/1, flush/0, delete/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -23,6 +23,8 @@ get(Key) ->
     gen_server:call(?MODULE, {get, Key}).
 flush() ->
     gen_server:call(?MODULE, {flush}).
+delete(Key) ->
+    gen_server:call(?MODULE, {delete, Key}).
 
 init([]) ->
     {ok, #state{kv=dict:new()}}.
@@ -40,6 +42,9 @@ handle_call({get, Key}, _From, #state{kv=KV}) ->
     end;
 handle_call({flush}, _From, #state{kv=_KV}) ->
     {reply, {ok}, #state{kv=dict:new()}};
+handle_call({delete, Key}, _From, #state{kv=KV}) ->
+    NewKV = dict:erase(Key, KV),
+    {reply, {ok}, #state{kv=NewKV}};
 handle_call(_Request, _From, State) ->
     Reply = fellthrough,
     {reply, Reply, State}.

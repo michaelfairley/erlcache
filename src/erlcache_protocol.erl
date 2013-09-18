@@ -69,6 +69,9 @@ handle_command(?GET, Key, _Body, _Extras, _CAS) ->
 	notfound ->
 	    #response{opcode=?GET, status=?NOT_FOUND}
     end;
+handle_command(?DELETE, Key, _Body, _Extras, _CAS) ->
+    erlcache_cache:delete(Key),
+    #response{opcode=?DELETE, status=?SUCCESS};
 handle_command(?SET, Key, Value, Extras, _CAS) ->
     <<Flags:32, Expiration:32>> = Extras,
     ok = erlcache_cache:set(Key, Value, Expiration, Flags),

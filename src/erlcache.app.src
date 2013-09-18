@@ -1,0 +1,13 @@
+{application, erlcache,
+ [
+  {description, "A memcached implementation"},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {mod, { erlcache_app, []}},
+  {env, []},
+  {modules, [erlcache_listener_sup, erlcache_listener]}
+ ]}.

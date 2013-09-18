@@ -9,5 +9,5 @@
                  ]},
   {mod, { erlcache_app, []}},
   {env, []},
-  {modules, [erlcache_listener_sup, erlcache_listener]}
+  {modules, []}
  ]}.

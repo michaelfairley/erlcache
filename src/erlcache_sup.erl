@@ -24,4 +24,4 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
-    {ok, { {one_for_one, 5, 10}, [?CHILD(erlcache_listener_sup, worker)]} }.
+    {ok, { {one_for_one, 5, 10}, [?CHILD(erlcache_cache, worker)]} }.

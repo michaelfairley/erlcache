@@ -108,7 +108,10 @@ handle_command(?REPLACE, Key, Value, Extras, _CAS) ->
 	     end,
     {reply, #response{status=Status}};
 handle_command(?VERSION, <<>>, <<>>, <<>>, _CASE) ->
-    {reply, #response{status=?SUCCESS, body= <<"1.2.3">>}}.
+    {reply, #response{status=?SUCCESS, body= <<"1.2.3">>}};
+handle_command(_, _, _, _, _) ->
+    {reply, #response{status=?UNKNOWN_COMMAND}}.
+
 
 response_to_binary(Response, Opaque, Opcode) ->
     #response{status=Status,

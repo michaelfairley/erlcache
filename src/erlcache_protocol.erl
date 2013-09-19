@@ -11,6 +11,8 @@
 	  extras = <<>>
 	 }).
 
+-define(TIMEOUT, 5000).
+
 start_link(Ref, Socket, Transport, Opts) ->
     Pid = spawn_link(?MODULE, init, [Ref, Socket, Transport, Opts]),
         {ok, Pid}.
@@ -22,14 +24,14 @@ init(Ref, Socket, Transport, _Opts = []) ->
 recv(Transport, Socket, Length) ->
     if
 	Length > 0 ->
-	    {ok, Data} = Transport:recv(Socket, Length, 1000),
+	    {ok, Data} = Transport:recv(Socket, Length, ?TIMEOUT),
 	    Data;
 	true ->
 	    <<>>
     end.
 
 loop(Socket, Transport) ->
-    case Transport:recv(Socket, ?HEADER_LENGTH, 1000) of
+    case Transport:recv(Socket, ?HEADER_LENGTH, ?TIMEOUT) of
         {ok, Data} ->
 	    <<16#80:8,
 	      Opcode:8,
@@ -75,6 +77,22 @@ handle_command(?SET, Key, Value, Extras, _CAS) ->
     <<Flags:32, Expiration:32>> = Extras,
     ok = erlcache_cache:set(Key, Value, Expiration, Flags),
     #response{status=?SUCCESS};
+handle_command(?ADD, Key, Value, Extras, _CAS) ->
+    <<Flags:32, Expiration:32>> = Extras,
+    Success = erlcache_cache:add(Key, Value, Expiration, Flags),
+    Status = case Success of
+		 ok -> ?SUCCESS;
+		 key_exists -> ?KEY_EXISTS
+	     end,
+    #response{status=Status};
+handle_command(?REPLACE, Key, Value, Extras, _CAS) ->
+    <<Flags:32, Expiration:32>> = Extras,
+    Success = erlcache_cache:replace(Key, Value, Expiration, Flags),
+    Status = case Success of
+		 ok -> ?SUCCESS;
+		 not_found -> ?NOT_FOUND
+	     end,
+    #response{status=Status};
 handle_command(?VERSION, <<>>, <<>>, <<>>, _CASE) ->
     #response{status=?SUCCESS, body= <<"1.2.3">>}.
 

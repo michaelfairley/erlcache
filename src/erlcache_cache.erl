@@ -3,7 +3,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, set/4, get/1, flush/0, delete/1]).
+-export([start_link/0, set/4, add/4, replace/4, get/1, flush/0, delete/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -19,6 +19,10 @@ start_link() ->
 
 set(Key, Value, Expiration, Flags) ->
     gen_server:call(?MODULE, {set, Key, Value, Expiration, Flags}).
+add(Key, Value, Expiration, Flags) ->
+    gen_server:call(?MODULE, {add, Key, Value, Expiration, Flags}).
+replace(Key, Value, Expiration, Flags) ->
+    gen_server:call(?MODULE, {replace, Key, Value, Expiration, Flags}).
 get(Key) ->
     gen_server:call(?MODULE, {get, Key}).
 flush() ->
@@ -32,6 +36,22 @@ init([]) ->
 handle_call({set, Key, Value, _Expiration, Flags}, _From, #state{kv=KV}) ->
     NewKV = dict:store(Key, #item{value=Value, flags=Flags}, KV),
     {reply, ok, #state{kv=NewKV}};
+handle_call({add, Key, Value, _Expiration, Flags}, _From, #state{kv=KV}) ->
+    case dict:is_key(Key, KV) of
+	true ->
+	    {reply, key_exists, #state{kv=KV}};
+	false ->
+	    NewKV = dict:store(Key, #item{value=Value, flags=Flags}, KV),
+	    {reply, ok, #state{kv=NewKV}}
+    end;
+handle_call({replace, Key, Value, _Expiration, Flags}, _From, #state{kv=KV}) ->
+    case dict:is_key(Key, KV) of
+	true ->
+	    NewKV = dict:store(Key, #item{value=Value, flags=Flags}, KV),
+	    {reply, ok, #state{kv=NewKV}};
+	false ->
+	    {reply, not_found, #state{kv=KV}}
+    end;
 handle_call({get, Key}, _From, #state{kv=KV}) ->
     case dict:find(Key, KV) of
 	{ok, #item{value=Value, flags=Flags}} ->

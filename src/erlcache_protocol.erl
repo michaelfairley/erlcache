@@ -19,7 +19,7 @@ start_link(Ref, Socket, Transport, Opts) ->
 
 init(Ref, Socket, Transport, _Opts = []) ->
     ok = ranch:accept_ack(Ref),
-    loop(Socket, Transport).
+    loop(Socket, Transport, []).
 
 recv(Transport, Socket, Length) ->
     if
@@ -30,7 +30,7 @@ recv(Transport, Socket, Length) ->
 	    <<>>
     end.
 
-loop(Socket, Transport) ->
+loop(Socket, Transport, Queue) ->
     case Transport:recv(Socket, ?HEADER_LENGTH, ?TIMEOUT) of
         {ok, Data} ->
 	    <<16#80:8,
@@ -49,34 +49,48 @@ loop(Socket, Transport) ->
 	    BodyLength = TotalBodyLength - KeyLength - ExtrasLength,
 	    Body = recv(Transport, Socket, BodyLength),
 
-	    Response = handle_command(Opcode, Key, Body, Extras, CAS),
-	    ResponseData = response_to_binary(Response, Opaque, Opcode),
-
-            Transport:send(Socket, ResponseData),
-	    loop(Socket, Transport);
+	    case handle_command(Opcode, Key, Body, Extras, CAS) of
+		{reply, Response} ->
+		    ResponseData = response_to_binary(Response, Opaque, Opcode),
+		    Transport:send(Socket, lists:reverse(Queue)),
+		    Transport:send(Socket, ResponseData),
+		    loop(Socket, Transport, []);
+		{defer, Response} ->
+		    ResponseData = response_to_binary(Response, Opaque, Opcode),
+		    loop(Socket, Transport, [ResponseData|Queue]);
+		no_response ->
+		    loop(Socket, Transport, Queue)
+	    end;
 	_ ->
 	    ok = Transport:close(Socket)
     end.
 
 handle_command(?NOOP, _Key, _Body, _Extras, _CAS) ->
-    #response{status=?SUCCESS};
+    {reply, #response{status=?SUCCESS}};
 handle_command(?FLUSH, _Key, _Body, _Extras, _CAS) ->
     erlcache_cache:flush(),
-    #response{status=?SUCCESS};
+    {reply, #response{status=?SUCCESS}};
 handle_command(?GET, Key, _Body, _Extras, _CAS) ->
     case erlcache_cache:get(Key) of
 	{ok, Value, Flags} ->
-	    #response{status=?SUCCESS, body=Value, extras=Flags};
+	    {reply, #response{status=?SUCCESS, body=Value, extras=Flags}};
 	notfound ->
-	    #response{status=?NOT_FOUND}
+	    {reply, #response{status=?NOT_FOUND}}
+    end;
+handle_command(?GETQ, Key, _Body, _Extras, _CAS) ->
+    case erlcache_cache:get(Key) of
+	{ok, Value, Flags} ->
+	    {defer, #response{status=?SUCCESS, body=Value, extras=Flags}};
+	notfound ->
+	    no_response
     end;
 handle_command(?DELETE, Key, _Body, _Extras, _CAS) ->
     erlcache_cache:delete(Key),
-    #response{status=?SUCCESS};
+    {reply, #response{status=?SUCCESS}};
 handle_command(?SET, Key, Value, Extras, _CAS) ->
     <<Flags:32, Expiration:32>> = Extras,
     ok = erlcache_cache:set(Key, Value, Expiration, Flags),
-    #response{status=?SUCCESS};
+    {reply, #response{status=?SUCCESS}};
 handle_command(?ADD, Key, Value, Extras, _CAS) ->
     <<Flags:32, Expiration:32>> = Extras,
     Success = erlcache_cache:add(Key, Value, Expiration, Flags),
@@ -84,7 +98,7 @@ handle_command(?ADD, Key, Value, Extras, _CAS) ->
 		 ok -> ?SUCCESS;
 		 key_exists -> ?KEY_EXISTS
 	     end,
-    #response{status=Status};
+    {reply, #response{status=Status}};
 handle_command(?REPLACE, Key, Value, Extras, _CAS) ->
     <<Flags:32, Expiration:32>> = Extras,
     Success = erlcache_cache:replace(Key, Value, Expiration, Flags),
@@ -92,9 +106,9 @@ handle_command(?REPLACE, Key, Value, Extras, _CAS) ->
 		 ok -> ?SUCCESS;
 		 not_found -> ?NOT_FOUND
 	     end,
-    #response{status=Status};
+    {reply, #response{status=Status}};
 handle_command(?VERSION, <<>>, <<>>, <<>>, _CASE) ->
-    #response{status=?SUCCESS, body= <<"1.2.3">>}.
+    {reply, #response{status=?SUCCESS, body= <<"1.2.3">>}}.
 
 response_to_binary(Response, Opaque, Opcode) ->
     #response{status=Status,

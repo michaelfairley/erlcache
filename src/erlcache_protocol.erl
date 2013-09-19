@@ -75,7 +75,9 @@ handle_command(?DELETE, Key, _Body, _Extras, _CAS) ->
 handle_command(?SET, Key, Value, Extras, _CAS) ->
     <<Flags:32, Expiration:32>> = Extras,
     ok = erlcache_cache:set(Key, Value, Expiration, Flags),
-    #response{opcode=?SET, status=?SUCCESS}.
+    #response{opcode=?SET, status=?SUCCESS};
+handle_command(?VERSION, <<>>, <<>>, <<>>, _CASE) ->
+    #response{opcode=?VERSION, status=?SUCCESS, body= <<"1.2.3">>}.
 
 response_to_binary(Response, Opaque) ->
     #response{opcode=Opcode,

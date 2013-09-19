@@ -5,7 +5,6 @@
 -export([init/4]).
 
 -record(response, {
-	  opcode,
 	  status,
 	  body = <<>>,
 	  key = <<>>,
@@ -49,7 +48,7 @@ loop(Socket, Transport) ->
 	    Body = recv(Transport, Socket, BodyLength),
 
 	    Response = handle_command(Opcode, Key, Body, Extras, CAS),
-	    ResponseData = response_to_binary(Response, Opaque),
+	    ResponseData = response_to_binary(Response, Opaque, Opcode),
 
             Transport:send(Socket, ResponseData),
 	    loop(Socket, Transport);
@@ -58,30 +57,29 @@ loop(Socket, Transport) ->
     end.
 
 handle_command(?NOOP, _Key, _Body, _Extras, _CAS) ->
-    #response{opcode=?NOOP, status=?SUCCESS};
+    #response{status=?SUCCESS};
 handle_command(?FLUSH, _Key, _Body, _Extras, _CAS) ->
     erlcache_cache:flush(),
-    #response{opcode=?FLUSH, status=?SUCCESS};
+    #response{status=?SUCCESS};
 handle_command(?GET, Key, _Body, _Extras, _CAS) ->
     case erlcache_cache:get(Key) of
 	{ok, Value, Flags} ->
-	    #response{opcode=?GET, status=?SUCCESS, body=Value, extras=Flags};
+	    #response{status=?SUCCESS, body=Value, extras=Flags};
 	notfound ->
-	    #response{opcode=?GET, status=?NOT_FOUND}
+	    #response{status=?NOT_FOUND}
     end;
 handle_command(?DELETE, Key, _Body, _Extras, _CAS) ->
     erlcache_cache:delete(Key),
-    #response{opcode=?DELETE, status=?SUCCESS};
+    #response{status=?SUCCESS};
 handle_command(?SET, Key, Value, Extras, _CAS) ->
     <<Flags:32, Expiration:32>> = Extras,
     ok = erlcache_cache:set(Key, Value, Expiration, Flags),
-    #response{opcode=?SET, status=?SUCCESS};
+    #response{status=?SUCCESS};
 handle_command(?VERSION, <<>>, <<>>, <<>>, _CASE) ->
-    #response{opcode=?VERSION, status=?SUCCESS, body= <<"1.2.3">>}.
+    #response{status=?SUCCESS, body= <<"1.2.3">>}.
 
-response_to_binary(Response, Opaque) ->
-    #response{opcode=Opcode,
-	      status=Status,
+response_to_binary(Response, Opaque, Opcode) ->
+    #response{status=Status,
 	      body=Body,
 	      extras=Extras,
 	      key=Key

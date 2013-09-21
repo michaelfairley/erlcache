@@ -134,6 +134,24 @@ handle_command(?DECR, Key, <<>>, <<Amount:64, Initial:64, Expiration:32>>, _CAS)
 	not_found ->
 	    {reply, #response{status=?NOT_FOUND}}
     end;
+handle_command(?APPEND, Key, Value, <<>>, CAS) ->
+    case erlcache_cache:append(Key, Value, CAS) of
+	ok ->
+	    {reply, #response{status=?SUCCESS}};
+	not_found ->
+	    {reply, #response{status=?NOT_FOUND}};
+	key_exists ->
+	    {reply, #response{status=?KEY_EXISTS}}
+    end;
+handle_command(?PREPEND, Key, Value, <<>>, CAS) ->
+    case erlcache_cache:prepend(Key, Value, CAS) of
+	ok ->
+	    {reply, #response{status=?SUCCESS}};
+	not_found ->
+	    {reply, #response{status=?NOT_FOUND}};
+	key_exists ->
+	    {reply, #response{status=?KEY_EXISTS}}
+    end;
 handle_command(_, _, _, _, _) ->
     io:format("No match", []),
     {reply, #response{status=?UNKNOWN_COMMAND}}.

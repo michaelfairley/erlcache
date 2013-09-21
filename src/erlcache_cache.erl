@@ -3,7 +3,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, set/5, add/5, replace/5, get/1, flush/0, delete/2, incr/4]).
+-export([start_link/0, set/5, add/5, replace/5, get/1, flush/0, delete/2, incr/4, append/3, prepend/3]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -36,6 +36,10 @@ delete(Key, CAS) ->
     gen_server:call(?MODULE, {delete, Key, CAS}).
 incr(Key, Amount, Initial, Expiration) ->
     gen_server:call(?MODULE, {incr, Key, Amount, Initial, Expiration}).
+append(Key, Value, CAS) ->
+    gen_server:call(?MODULE, {append, Key, Value, CAS}).
+prepend(Key, Value, CAS) ->
+    gen_server:call(?MODULE, {prepend, Key, Value, CAS}).
 
 init([]) ->
     {ok, #state{kv=dict:new()}}.
@@ -120,6 +124,36 @@ handle_call({incr, Key, Amount, Initial, Expiration}, _From, #state{kv=KV}) ->
 		    NewKV = dict:store(Key, #item{value=int_to_binary(Initial)}, KV),
 		    {reply, {ok, Initial, ?NEW_CAS}, #state{kv=NewKV}}
 	    end
+    end;
+handle_call({append, Key, Value, CAS}, _From, #state{kv=KV}) ->
+    case dict:find(Key, KV) of
+	{ok, #item{value=OriginalValue, flags=Flags}} when CAS == ?EMPTY_CAS->
+	    NewValue = <<OriginalValue/binary, Value/binary>>,
+	    NewKV = dict:store(Key, #item{value=NewValue, flags=Flags}, KV),
+	    {reply, ok, #state{kv=NewKV}};
+	{ok, #item{value=OriginalValue, flags=Flags, cas=CAS}} ->
+	    NewValue = <<OriginalValue/binary, Value/binary>>,
+	    NewKV = dict:store(Key, #item{value=NewValue, flags=Flags, cas=CAS+1}, KV),
+	    {reply, ok, #state{kv=NewKV}};
+	error ->
+	    {reply, not_found, #state{kv=KV}};
+	_ ->
+	    {reply, key_exists, #state{kv=KV}}
+    end;
+handle_call({prepend, Key, Value, CAS}, _From, #state{kv=KV}) ->
+    case dict:find(Key, KV) of
+	{ok, #item{value=OriginalValue, flags=Flags}} when CAS == ?EMPTY_CAS->
+	    NewValue = <<Value/binary, OriginalValue/binary>>,
+	    NewKV = dict:store(Key, #item{value=NewValue, flags=Flags}, KV),
+	    {reply, ok, #state{kv=NewKV}};
+	{ok, #item{value=OriginalValue, flags=Flags, cas=CAS}} ->
+	    NewValue = <<Value/binary, OriginalValue/binary>>,
+	    NewKV = dict:store(Key, #item{value=NewValue, flags=Flags, cas=CAS+1}, KV),
+	    {reply, ok, #state{kv=NewKV}};
+	error ->
+	    {reply, not_found, #state{kv=KV}};
+	_ ->
+	    {reply, key_exists, #state{kv=KV}}
     end;
 handle_call(_Request, _From, State) ->
     Reply = fellthrough,

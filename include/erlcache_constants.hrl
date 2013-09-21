@@ -7,8 +7,8 @@
 -define(ADD,         16#02).
 -define(REPLACE,     16#03).
 -define(DELETE,      16#04).
--define(INCREMENT,   16#05).
--define(DECREMENT,   16#06).
+-define(INCR,        16#05).
+-define(DECR,        16#06).
 -define(QUIT,        16#07).
 -define(FLUSH,       16#08).
 -define(GETQ,        16#09).

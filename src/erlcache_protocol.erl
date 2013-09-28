@@ -68,8 +68,13 @@ loop(Socket, Transport, Queue) ->
 
 handle_command(?NOOP, _Key, _Body, _Extras, _CAS) ->
     {reply, #response{status=?SUCCESS}};
-handle_command(?FLUSH, _Key, _Body, _Extras, _CAS) ->
-    erlcache_cache:flush(),
+handle_command(?FLUSH, _Key, _Body, <<Expiration:32>>, _CAS) ->
+    case Expiration of
+	0 ->
+	    erlcache_cache:flush();
+	_ ->
+	    timer:apply_after(Expiration, erlcache_cache, flush, [])
+    end,
     {reply, #response{status=?SUCCESS}};
 handle_command(?GET, Key, _Body, _Extras, _CAS) ->
     case erlcache_cache:get(Key) of

@@ -10,15 +10,11 @@ ensure
   run("./rel/dummynode/bin/dummynode stop")
 end
 
-task :compile do
-  run("rebar compile")
+task :build do
+  run("rebar compile generate")
 end
 
-task :build_release => [:compile] do
-  run("rebar generate")
-end
-
-task :memcached_test => [:build_release] do
+task :memcached_test => [:build] do
   with_erlcache do
     run("python integration_tests/memcached-test/testClient.py")
   end

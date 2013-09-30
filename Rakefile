@@ -7,7 +7,7 @@ def with_erlcache(&blk)
   sleep 1
   yield
 ensure
-  run("./rel/dummynode/bin/dummynode ping || ./rel/dummynode/bin/dummynode stop")
+  system("./rel/dummynode/bin/dummynode stop")
 end
 
 task :build do

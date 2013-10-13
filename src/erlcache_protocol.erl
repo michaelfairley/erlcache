@@ -95,6 +95,13 @@ handle_command(?GETQ, Key, _Body, _Extras, _CAS) ->
 	not_found ->
 	    no_response
     end;
+handle_command(?GETKQ, Key, _Body, _Extras, _CAS) ->
+    case erlcache_cache:get(Key) of
+	{ok, Value, Flags, CAS} ->
+	    {defer, #response{status=?SUCCESS, key=Key, body=Value, extras=Flags, cas=CAS}};
+	not_found ->
+	    no_response
+    end;
 handle_command(?DELETE, Key, _Body, _Extras, CAS) ->
     case erlcache_cache:delete(Key, CAS) of
 	ok ->
@@ -111,6 +118,13 @@ handle_command(?SET, Key, Value, Extras, CAS) ->
 	    {reply, #response{status=?NOT_FOUND, cas=NewCAS}};
 	{key_exists, NewCAS} ->
 	    {reply, #response{status=?KEY_EXISTS, cas=NewCAS}}
+    end;
+handle_command(?SETQ, Key, Value, Extras, CAS) ->
+    case handle_command(?SET, Key, Value, Extras, CAS) of
+	{reply, #response{status=?SUCCESS}} ->
+	    no_response;
+	Response ->
+	    Response
     end;
 handle_command(?ADD, Key, Value, Extras, CAS) ->
     <<Flags:32, Expiration:32>> = Extras,
@@ -168,8 +182,8 @@ handle_command(?STAT, _Key, <<>>, <<>>, _CAS) ->
 		     [#response{status=?SUCCESS, key=atom_to_binary(Key, utf8), body=Value} | RespAcc]
 	     end, [#response{status=?SUCCESS}], Stats),
     {reply_many, Responses};
-handle_command(_, _, _, _, _) ->
-    io:format("No match", []),
+handle_command(OpCode, _, _, _, _) ->
+    io:format("No match: ~.16B~n", [OpCode]),
     {reply, #response{status=?UNKNOWN_COMMAND}}.
 
 

@@ -162,8 +162,8 @@ handle_command(?APPEND, Key, Value, <<>>, CAS) ->
     case erlcache_cache:append(Key, Value, CAS) of
 	ok ->
 	    {reply, #response{status=?SUCCESS}};
-	not_found ->
-	    {reply, #response{status=?NOT_FOUND}};
+	not_stored ->
+	    {reply, #response{status=?NOT_STORED}};
 	key_exists ->
 	    {reply, #response{status=?KEY_EXISTS}}
     end;
@@ -171,8 +171,8 @@ handle_command(?PREPEND, Key, Value, <<>>, CAS) ->
     case erlcache_cache:prepend(Key, Value, CAS) of
 	ok ->
 	    {reply, #response{status=?SUCCESS}};
-	not_found ->
-	    {reply, #response{status=?NOT_FOUND}};
+	not_stored ->
+	    {reply, #response{status=?NOT_STORED}};
 	key_exists ->
 	    {reply, #response{status=?KEY_EXISTS}}
     end;

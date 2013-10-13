@@ -140,7 +140,7 @@ handle_call({append, Key, Value, CAS}, _From, #state{kv=KV, stats=Stats}) ->
 	    NewKV = dict:store(Key, #item{value=NewValue, flags=Flags, cas=CAS+1}, KV),
 	    {reply, ok, #state{kv=NewKV, stats=Stats}};
 	error ->
-	    {reply, not_found, #state{kv=KV, stats=Stats}};
+	    {reply, not_stored, #state{kv=KV, stats=Stats}};
 	_ ->
 	    {reply, key_exists, #state{kv=KV, stats=Stats}}
     end;
@@ -155,7 +155,7 @@ handle_call({prepend, Key, Value, CAS}, _From, #state{kv=KV, stats=Stats}) ->
 	    NewKV = dict:store(Key, #item{value=NewValue, flags=Flags, cas=CAS+1}, KV),
 	    {reply, ok, #state{kv=NewKV, stats=Stats}};
 	error ->
-	    {reply, not_found, #state{kv=KV, stats=Stats}};
+	    {reply, not_stored, #state{kv=KV, stats=Stats}};
 	_ ->
 	    {reply, key_exists, #state{kv=KV, stats=Stats}}
     end;

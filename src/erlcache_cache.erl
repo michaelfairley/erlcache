@@ -46,7 +46,8 @@ stat() ->
 init([]) ->
     Stats = dict:new(),
     Stats1 = dict:store(get_hits, <<"0">>, Stats),
-    {ok, #state{kv=dict:new(), stats=Stats1}}.
+    Stats2 = dict:store(cmd_flush, <<"0">>, Stats1),
+    {ok, #state{kv=dict:new(), stats=Stats2}}.
 
 handle_call({set, Key, Value, _Expiration, Flags, CAS}, _From, #state{kv=KV, stats=Stats}) ->
     case dict:find(Key, KV) of
@@ -96,7 +97,8 @@ handle_call({get, Key}, _From, #state{kv=KV, stats=Stats}) ->
 	    {reply, not_found, #state{kv=KV, stats=Stats}}
     end;
 handle_call({flush}, _From, #state{kv=_KV, stats=Stats}) ->
-    {reply, {ok}, #state{kv=dict:new(), stats=Stats}};
+    NewStats = dict:update(cmd_flush, incr_binary_fun(1), Stats),
+    {reply, {ok}, #state{kv=dict:new(), stats=NewStats}};
 handle_call({delete, Key, CAS}, _From, #state{kv=KV, stats=Stats}) ->
     case dict:find(Key, KV) of
 	{ok, #item{cas=CAS}} ->
@@ -191,3 +193,10 @@ int_to_binary(0, Bin) ->
 int_to_binary(Num, Bin) ->
     Char = (Num rem 10) + $0,
     int_to_binary(Num div 10, <<Char:8, Bin/binary>>).
+
+incr_binary_fun(Amount) ->
+    fun(BinaryBefore) ->
+	    IntBefore = binary_to_int(BinaryBefore),
+	    IntAfter = IntBefore + Amount,
+	    int_to_binary(IntAfter)
+    end.

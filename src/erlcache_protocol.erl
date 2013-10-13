@@ -73,6 +73,8 @@ loop(Socket, Transport, Queue) ->
 
 handle_command(?NOOP, _Key, _Body, _Extras, _CAS) ->
     {reply, #response{status=?SUCCESS}};
+handle_command(?FLUSH, _Key, _Body, <<>>, _CAS) ->
+    handle_command(?FLUSH, <<>>, <<>>, <<0:32>>, <<>>);
 handle_command(?FLUSH, _Key, _Body, <<Expiration:32>>, _CAS) ->
     case Expiration of
 	0 ->

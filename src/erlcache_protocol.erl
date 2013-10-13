@@ -188,6 +188,25 @@ handle_command(OpCode, _, _, _, _) ->
     io:format("No match: ~.16B~n", [OpCode]),
     {reply, #response{status=?UNKNOWN_COMMAND}}.
 
+add_error_string(Response=#response{status=?SUCCESS}) ->
+    Response;
+add_error_string(Response=#response{status=?NOT_FOUND}) ->
+    Response#response{body= <<"Not found">>};
+add_error_string(Response=#response{status=?KEY_EXISTS}) ->
+    Response#response{body= <<"Key exists">>};
+add_error_string(Response=#response{status=?TOO_LARGE}) ->
+    Response#response{body= <<"Too large">>};
+add_error_string(Response=#response{status=?INVALID_ARGUMENTS}) ->
+    Response#response{body= <<"Invalid arguments">>};
+add_error_string(Response=#response{status=?NOT_STORED}) ->
+    Response#response{body= <<"Not stored">>};
+add_error_string(Response=#response{status=?NON_NUMERIC}) ->
+    Response#response{body= <<"Non numeric">>};
+add_error_string(Response=#response{status=?UNKNOWN_COMMAND}) ->
+    Response#response{body= <<"Unknown command">>};
+add_error_string(Response=#response{status=?OUT_OF_MEMORY}) ->
+    Response#response{body= <<"Out of memory">>}.
+
 
 response_to_binary(Response, Opaque, Opcode) ->
     #response{status=Status,
@@ -195,7 +214,7 @@ response_to_binary(Response, Opaque, Opcode) ->
 	      extras=Extras,
 	      key=Key,
 	      cas=CAS
-	     } = Response,
+	     } = add_error_string(Response),
     BodyLength = byte_size(Body),
     ExtrasLength = byte_size(Extras),
     KeyLength = byte_size(Key),

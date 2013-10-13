@@ -56,6 +56,11 @@ loop(Socket, Transport, Queue) ->
 		    Transport:send(Socket, lists:reverse(Queue)),
 		    Transport:send(Socket, ResponseData),
 		    loop(Socket, Transport, []);
+		{reply_many, Responses} ->
+		    ResponsesData = [response_to_binary(Response, Opaque, Opcode) || Response <- Responses],
+		    Transport:send(Socket, lists:reverse(Queue)),
+		    Transport:send(Socket, ResponsesData),
+		    loop(Socket, Transport, []);
 		{defer, Response} ->
 		    ResponseData = response_to_binary(Response, Opaque, Opcode),
 		    loop(Socket, Transport, [ResponseData|Queue]);
@@ -157,6 +162,12 @@ handle_command(?PREPEND, Key, Value, <<>>, CAS) ->
 	key_exists ->
 	    {reply, #response{status=?KEY_EXISTS}}
     end;
+handle_command(?STAT, _Key, <<>>, <<>>, _CAS) ->
+    Stats = erlcache_cache:stat(),
+    Responses = dict:fold(fun(Key, Value, RespAcc) ->
+		     [#response{status=?SUCCESS, key=atom_to_binary(Key, utf8), body=Value} | RespAcc]
+	     end, [#response{status=?SUCCESS}], Stats),
+    {reply_many, Responses};
 handle_command(_, _, _, _, _) ->
     io:format("No match", []),
     {reply, #response{status=?UNKNOWN_COMMAND}}.

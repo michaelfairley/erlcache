@@ -119,7 +119,9 @@ handle_command(?SET, Key, Value, Extras, CAS) ->
 	{not_found, NewCAS} ->
 	    {reply, #response{status=?NOT_FOUND, cas=NewCAS}};
 	{key_exists, NewCAS} ->
-	    {reply, #response{status=?KEY_EXISTS, cas=NewCAS}}
+	    {reply, #response{status=?KEY_EXISTS, cas=NewCAS}};
+	too_large ->
+	    {reply, #response{status=?TOO_LARGE}}
     end;
 handle_command(?SETQ, Key, Value, Extras, CAS) ->
     case handle_command(?SET, Key, Value, Extras, CAS) of

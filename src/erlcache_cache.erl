@@ -49,6 +49,9 @@ init([]) ->
     Stats2 = dict:store(cmd_flush, <<"0">>, Stats1),
     {ok, #state{kv=dict:new(), stats=Stats2}}.
 
+handle_call({set, Key, Value, _Expiration, _Flags, _CAS}, _From, State) when size(Value) > 1024*1024 ->
+    NewKV = dict:erase(Key, State#state.kv),
+    {reply, too_large, State#state{kv=NewKV}};
 handle_call({set, Key, Value, _Expiration, Flags, CAS}, _From, #state{kv=KV, stats=Stats}) ->
     case dict:find(Key, KV) of
 	{ok, #item{cas=OldCAS}} ->

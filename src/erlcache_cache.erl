@@ -52,127 +52,127 @@ init([]) ->
 handle_call({set, Key, Value, _Expiration, _Flags, _CAS}, _From, State) when size(Value) > 1024*1024 ->
     NewKV = dict:erase(Key, State#state.kv),
     {reply, too_large, State#state{kv=NewKV}};
-handle_call({set, Key, Value, _Expiration, Flags, CAS}, _From, #state{kv=KV, stats=Stats}) ->
-    case dict:find(Key, KV) of
+handle_call({set, Key, Value, _Expiration, Flags, CAS}, _From, State) ->
+    case dict:find(Key, State#state.kv) of
 	{ok, #item{cas=OldCAS}} ->
 	    case CAS of
 		?EMPTY_CAS ->
-		    NewKV = dict:store(Key, #item{value=Value, flags=Flags}, KV),
-		    {reply, {ok, ?NEW_CAS}, #state{kv=NewKV, stats=Stats}};
+		    NewKV = dict:store(Key, #item{value=Value, flags=Flags}, State#state.kv),
+		    {reply, {ok, ?NEW_CAS}, State#state{kv=NewKV}};
 		OldCAS ->
 		    NewCAS = CAS+1,
-		    NewKV = dict:store(Key, #item{value=Value, flags=Flags, cas=NewCAS}, KV),
-		    {reply, {ok, NewCAS}, #state{kv=NewKV, stats=Stats}};
+		    NewKV = dict:store(Key, #item{value=Value, flags=Flags, cas=NewCAS}, State#state.kv),
+		    {reply, {ok, NewCAS}, State#state{kv=NewKV}};
 		_ ->
-		    {reply, {key_exists, OldCAS}, #state{kv=KV, stats=Stats}}
+		    {reply, {key_exists, OldCAS}, State}
 	    end;
 	error ->
 	    case CAS of
 		?EMPTY_CAS ->
-		    NewKV = dict:store(Key, #item{value=Value, flags=Flags}, KV),
-		    {reply, {ok, ?NEW_CAS}, #state{kv=NewKV, stats=Stats}};
+		    NewKV = dict:store(Key, #item{value=Value, flags=Flags}, State#state.kv),
+		    {reply, {ok, ?NEW_CAS}, State#state{kv=NewKV}};
 		_ ->
-		    {reply, {not_found, ?EMPTY_CAS}, #state{kv=KV, stats=Stats}}
+		    {reply, {not_found, ?EMPTY_CAS}, State}
 	    end
     end;
-handle_call({add, Key, Value, _Expiration, Flags, _CAS}, _From, #state{kv=KV, stats=Stats}) ->
-    case dict:find(Key, KV) of
+handle_call({add, Key, Value, _Expiration, Flags, _CAS}, _From, State) ->
+    case dict:find(Key, State#state.kv) of
 	{ok, #item{cas=OldCAS}} ->
-	    {reply, {key_exists, OldCAS}, #state{kv=KV, stats=Stats}};
+	    {reply, {key_exists, OldCAS}, State};
 	error ->
-	    NewKV = dict:store(Key, #item{value=Value, flags=Flags}, KV),
-	    {reply, {ok, ?NEW_CAS}, #state{kv=NewKV, stats=Stats}}
+	    NewKV = dict:store(Key, #item{value=Value, flags=Flags}, State#state.kv),
+	    {reply, {ok, ?NEW_CAS}, State#state{kv=NewKV}}
     end;
-handle_call({replace, Key, Value, _Expiration, Flags, _CAS}, _From, #state{kv=KV, stats=Stats}) ->
-    case dict:find(Key, KV) of
+handle_call({replace, Key, Value, _Expiration, Flags, _CAS}, _From, State) ->
+    case dict:find(Key, State#state.kv) of
 	{ok, _Item} ->
-	    NewKV = dict:store(Key, #item{value=Value, flags=Flags}, KV),
-	    {reply, {ok, ?NEW_CAS}, #state{kv=NewKV, stats=Stats}};
+	    NewKV = dict:store(Key, #item{value=Value, flags=Flags}, State#state.kv),
+	    {reply, {ok, ?NEW_CAS}, State#state{kv=NewKV}};
 	error ->
-	    {reply, {not_found, ?EMPTY_CAS}, #state{kv=KV, stats=Stats}}
+	    {reply, {not_found, ?EMPTY_CAS}, State}
     end;
-handle_call({get, Key}, _From, #state{kv=KV, stats=Stats}) ->
-    case dict:find(Key, KV) of
+handle_call({get, Key}, _From, State) ->
+    case dict:find(Key, State#state.kv) of
 	{ok, #item{value=Value, flags=Flags, cas=CAS}} ->
 	    FlagBin = <<Flags:32>>,
-	    {reply, {ok, Value, FlagBin, CAS}, #state{kv=KV, stats=Stats}};
+	    {reply, {ok, Value, FlagBin, CAS}, State};
 	error ->
-	    {reply, not_found, #state{kv=KV, stats=Stats}}
+	    {reply, not_found, State}
     end;
 handle_call({flush}, _From, #state{kv=_KV, stats=Stats}) ->
     NewStats = dict:update(cmd_flush, incr_binary_fun(1), Stats),
     {reply, {ok}, #state{kv=dict:new(), stats=NewStats}};
-handle_call({delete, Key, CAS}, _From, #state{kv=KV, stats=Stats}) ->
-    case dict:find(Key, KV) of
+handle_call({delete, Key, CAS}, _From, State) ->
+    case dict:find(Key, State#state.kv) of
 	{ok, #item{cas=CAS}} ->
-	    NewKV = dict:erase(Key, KV),
-	    {reply, ok, #state{kv=NewKV, stats=Stats}};
+	    NewKV = dict:erase(Key, State#state.kv),
+	    {reply, ok, State#state{kv=NewKV}};
 	error ->
-	    {reply, ok, #state{kv=KV, stats=Stats}};
+	    {reply, ok, State};
 	_ ->
 	    case CAS of
 		?EMPTY_CAS ->
-		    NewKV = dict:erase(Key, KV),
-		    {reply, ok, #state{kv=NewKV, stats=Stats}};
+		    NewKV = dict:erase(Key, State#state.kv),
+		    {reply, ok, State#state{kv=NewKV}};
 		_ ->
-		    {reply, key_exists, #state{kv=KV, stats=Stats}}
+		    {reply, key_exists, State}
 	    end
     end;
-handle_call({incr, Key, Amount, Initial, Expiration}, _From, #state{kv=KV, stats=Stats}) ->
-    case dict:is_key(Key, KV) of
+handle_call({incr, Key, Amount, Initial, Expiration}, _From, State) ->
+    case dict:is_key(Key, State#state.kv) of
 	true ->
-	    #item{value=OldVal, cas=CAS} = dict:fetch(Key, KV),
+	    #item{value=OldVal, cas=CAS} = dict:fetch(Key, State#state.kv),
 	    try binary_to_integer(OldVal) of
 		OldValInt ->
 		    NewVal = max(OldValInt + Amount, 0),
 		    NewCAS = CAS+1,
-		    NewKV = dict:store(Key, #item{value=integer_to_binary(NewVal), cas=NewCAS}, KV),
-		    {reply, {ok, NewVal, NewCAS}, #state{kv=NewKV, stats=Stats}}
+		    NewKV = dict:store(Key, #item{value=integer_to_binary(NewVal), cas=NewCAS}, State#state.kv),
+		    {reply, {ok, NewVal, NewCAS}, State#state{kv=NewKV}}
 	    catch
 		error:badarg ->
-		    {reply, non_numeric, #state{kv=KV, stats=Stats}}
+		    {reply, non_numeric, State}
 	    end;
 	false ->
 	    if
 		Expiration == ?INCRDECR_NO_CREATE ->
-		    {reply, not_found, #state{kv=KV, stats=Stats}};
+		    {reply, not_found, State};
 		true ->
-		    NewKV = dict:store(Key, #item{value=integer_to_binary(Initial)}, KV),
-		    {reply, {ok, Initial, ?NEW_CAS}, #state{kv=NewKV, stats=Stats}}
+		    NewKV = dict:store(Key, #item{value=integer_to_binary(Initial)}, State#state.kv),
+		    {reply, {ok, Initial, ?NEW_CAS}, State#state{kv=NewKV}}
 	    end
     end;
-handle_call({append, Key, Value, CAS}, _From, #state{kv=KV, stats=Stats}) ->
-    case dict:find(Key, KV) of
+handle_call({append, Key, Value, CAS}, _From, State) ->
+    case dict:find(Key, State#state.kv) of
 	{ok, #item{value=OriginalValue, flags=Flags}} when CAS == ?EMPTY_CAS->
 	    NewValue = <<OriginalValue/binary, Value/binary>>,
-	    NewKV = dict:store(Key, #item{value=NewValue, flags=Flags}, KV),
-	    {reply, ok, #state{kv=NewKV, stats=Stats}};
+	    NewKV = dict:store(Key, #item{value=NewValue, flags=Flags}, State#state.kv),
+	    {reply, ok, State#state{kv=NewKV}};
 	{ok, #item{value=OriginalValue, flags=Flags, cas=CAS}} ->
 	    NewValue = <<OriginalValue/binary, Value/binary>>,
-	    NewKV = dict:store(Key, #item{value=NewValue, flags=Flags, cas=CAS+1}, KV),
-	    {reply, ok, #state{kv=NewKV, stats=Stats}};
+	    NewKV = dict:store(Key, #item{value=NewValue, flags=Flags, cas=CAS+1}, State#state.kv),
+	    {reply, ok, State#state{kv=NewKV}};
 	error ->
-	    {reply, not_stored, #state{kv=KV, stats=Stats}};
+	    {reply, not_stored, State};
 	_ ->
-	    {reply, key_exists, #state{kv=KV, stats=Stats}}
+	    {reply, key_exists, State}
     end;
-handle_call({prepend, Key, Value, CAS}, _From, #state{kv=KV, stats=Stats}) ->
-    case dict:find(Key, KV) of
+handle_call({prepend, Key, Value, CAS}, _From, State) ->
+    case dict:find(Key, State#state.kv) of
 	{ok, #item{value=OriginalValue, flags=Flags}} when CAS == ?EMPTY_CAS->
 	    NewValue = <<Value/binary, OriginalValue/binary>>,
-	    NewKV = dict:store(Key, #item{value=NewValue, flags=Flags}, KV),
-	    {reply, ok, #state{kv=NewKV, stats=Stats}};
+	    NewKV = dict:store(Key, #item{value=NewValue, flags=Flags}, State#state.kv),
+	    {reply, ok, State#state{kv=NewKV}};
 	{ok, #item{value=OriginalValue, flags=Flags, cas=CAS}} ->
 	    NewValue = <<Value/binary, OriginalValue/binary>>,
-	    NewKV = dict:store(Key, #item{value=NewValue, flags=Flags, cas=CAS+1}, KV),
-	    {reply, ok, #state{kv=NewKV, stats=Stats}};
+	    NewKV = dict:store(Key, #item{value=NewValue, flags=Flags, cas=CAS+1}, State#state.kv),
+	    {reply, ok, State#state{kv=NewKV}};
 	error ->
-	    {reply, not_stored, #state{kv=KV, stats=Stats}};
+	    {reply, not_stored, State};
 	_ ->
-	    {reply, key_exists, #state{kv=KV, stats=Stats}}
+	    {reply, key_exists, State}
     end;
-handle_call({stat}, _From, #state{kv=KV, stats=Stats}) ->
-    {reply, Stats, #state{kv=KV, stats=Stats}};
+handle_call({stat}, _From, State) ->
+    {reply, State#state.stats, State};
 handle_call(_Request, _From, State) ->
     Reply = fellthrough,
     {reply, Reply, State}.

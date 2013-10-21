@@ -122,15 +122,21 @@ handle_call({incr, Key, Amount, Initial, Expiration}, _From, #state{kv=KV, stats
     case dict:is_key(Key, KV) of
 	true ->
 	    #item{value=OldVal} = dict:fetch(Key, KV),
-	    NewVal = max(binary_to_int(OldVal) + Amount, 0),
-	    NewKV = dict:store(Key, #item{value=int_to_binary(NewVal)}, KV),
-	    {reply, {ok, NewVal, ?NEW_CAS}, #state{kv=NewKV, stats=Stats}};
+	    try binary_to_integer(OldVal) of
+		OldValInt ->
+		    NewVal = max(OldValInt + Amount, 0),
+		    NewKV = dict:store(Key, #item{value=integer_to_binary(NewVal)}, KV),
+		    {reply, {ok, NewVal, ?NEW_CAS}, #state{kv=NewKV, stats=Stats}}
+	    catch
+		error:badarg ->
+		    {reply, non_numeric, #state{kv=KV, stats=Stats}}
+	    end;
 	false ->
 	    if
 		Expiration == ?INCRDECR_NO_CREATE ->
 		    {reply, not_found, #state{kv=KV, stats=Stats}};
 		true ->
-		    NewKV = dict:store(Key, #item{value=int_to_binary(Initial)}, KV),
+		    NewKV = dict:store(Key, #item{value=integer_to_binary(Initial)}, KV),
 		    {reply, {ok, Initial, ?NEW_CAS}, #state{kv=NewKV, stats=Stats}}
 	    end
     end;
@@ -182,24 +188,9 @@ terminate(_Reason, _State) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-binary_to_int(Bin) ->
-    binary_to_int(Bin, 0).
-binary_to_int(<<>>, Acc) ->
-    Acc;
-binary_to_int(<<Digit:8, Rest/binary>>, Acc) ->
-    binary_to_int(Rest, Acc * 10 + (Digit - $0)).
-
-int_to_binary(Num) ->
-    int_to_binary(Num, <<>>).
-int_to_binary(0, Bin) ->
-    Bin;
-int_to_binary(Num, Bin) ->
-    Char = (Num rem 10) + $0,
-    int_to_binary(Num div 10, <<Char:8, Bin/binary>>).
-
 incr_binary_fun(Amount) ->
     fun(BinaryBefore) ->
-	    IntBefore = binary_to_int(BinaryBefore),
+	    IntBefore = binary_to_integer(BinaryBefore),
 	    IntAfter = IntBefore + Amount,
-	    int_to_binary(IntAfter)
+	    integer_to_binary(IntAfter)
     end.

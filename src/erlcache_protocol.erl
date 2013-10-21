@@ -153,14 +153,18 @@ handle_command(?INCR, Key, <<>>, <<Amount:64, Initial:64, Expiration:32>>, _CAS)
 	{ok, Value, NewCAS} ->
 	    {reply, #response{status=?SUCCESS, body= <<Value:64>>, cas=NewCAS}};
 	not_found ->
-	    {reply, #response{status=?NOT_FOUND}}
+	    {reply, #response{status=?NOT_FOUND}};
+	non_numeric ->
+	    {reply, #response{status=?NON_NUMERIC}}
     end;
 handle_command(?DECR, Key, <<>>, <<Amount:64, Initial:64, Expiration:32>>, _CAS) ->
     case erlcache_cache:incr(Key, -Amount, Initial, Expiration) of
 	{ok, Value, NewCAS} ->
 	    {reply, #response{status=?SUCCESS, body= <<Value:64>>, cas=NewCAS}};
 	not_found ->
-	    {reply, #response{status=?NOT_FOUND}}
+	    {reply, #response{status=?NOT_FOUND}};
+	non_numeric ->
+	    {reply, #response{status=?NON_NUMERIC}}
     end;
 handle_command(?APPEND, Key, Value, <<>>, CAS) ->
     case erlcache_cache:append(Key, Value, CAS) of

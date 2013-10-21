@@ -62,7 +62,7 @@ handle_call({set, Key, Value, _Expiration, Flags, CAS}, _From, #state{kv=KV, sta
 		OldCAS ->
 		    NewCAS = CAS+1,
 		    NewKV = dict:store(Key, #item{value=Value, flags=Flags, cas=NewCAS}, KV),
-		    {reply, {ok, ?NEW_CAS}, #state{kv=NewKV, stats=Stats}};
+		    {reply, {ok, NewCAS}, #state{kv=NewKV, stats=Stats}};
 		_ ->
 		    {reply, {key_exists, OldCAS}, #state{kv=KV, stats=Stats}}
 	    end;

@@ -121,12 +121,13 @@ handle_call({delete, Key, CAS}, _From, #state{kv=KV, stats=Stats}) ->
 handle_call({incr, Key, Amount, Initial, Expiration}, _From, #state{kv=KV, stats=Stats}) ->
     case dict:is_key(Key, KV) of
 	true ->
-	    #item{value=OldVal} = dict:fetch(Key, KV),
+	    #item{value=OldVal, cas=CAS} = dict:fetch(Key, KV),
 	    try binary_to_integer(OldVal) of
 		OldValInt ->
 		    NewVal = max(OldValInt + Amount, 0),
-		    NewKV = dict:store(Key, #item{value=integer_to_binary(NewVal)}, KV),
-		    {reply, {ok, NewVal, ?NEW_CAS}, #state{kv=NewKV, stats=Stats}}
+		    NewCAS = CAS+1,
+		    NewKV = dict:store(Key, #item{value=integer_to_binary(NewVal), cas=NewCAS}, KV),
+		    {reply, {ok, NewVal, NewCAS}, #state{kv=NewKV, stats=Stats}}
 	    catch
 		error:badarg ->
 		    {reply, non_numeric, #state{kv=KV, stats=Stats}}

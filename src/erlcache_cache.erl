@@ -16,7 +16,7 @@
 -define(NEW_CAS, 1).
 
 -record(state, {kv, stats}).
--record(item, {value, flags=0, cas=?NEW_CAS}).
+-record(item, {value, flags=0, cas=?NEW_CAS, expiration=infinity}).
 
 
 start_link() ->
@@ -52,7 +52,7 @@ init([]) ->
 handle_call({set, Key, Value, _Expiration, _Flags, _CAS}, _From, State) when size(Value) > 1024*1024 ->
     NewKV = dict:erase(Key, State#state.kv),
     {reply, too_large, State#state{kv=NewKV}};
-handle_call({set, Key, Value, _Expiration, Flags, CAS}, _From, State) ->
+handle_call({set, Key, Value, Expiration, Flags, CAS}, _From, State) ->
     case dict:find(Key, State#state.kv) of
 	{ok, #item{cas=OldCAS}} ->
 	    case CAS of
@@ -69,7 +69,7 @@ handle_call({set, Key, Value, _Expiration, Flags, CAS}, _From, State) ->
 	error ->
 	    case CAS of
 		?EMPTY_CAS ->
-		    NewKV = dict:store(Key, #item{value=Value, flags=Flags}, State#state.kv),
+		    NewKV = dict:store(Key, #item{value=Value, flags=Flags, expiration=expires_in(Expiration)}, State#state.kv),
 		    {reply, {ok, ?NEW_CAS}, State#state{kv=NewKV}};
 		_ ->
 		    {reply, {not_found, ?EMPTY_CAS}, State}
@@ -93,9 +93,14 @@ handle_call({replace, Key, Value, _Expiration, Flags, _CAS}, _From, State) ->
     end;
 handle_call({get, Key}, _From, State) ->
     case dict:find(Key, State#state.kv) of
-	{ok, #item{value=Value, flags=Flags, cas=CAS}} ->
-	    FlagBin = <<Flags:32>>,
-	    {reply, {ok, Value, FlagBin, CAS}, State};
+	{ok, #item{value=Value, flags=Flags, cas=CAS, expiration=Expiration}} ->
+	    case is_expired(Expiration) of
+		true ->
+		    {reply, not_found, State};
+		false ->
+		    FlagBin = <<Flags:32>>,
+		    {reply, {ok, Value, FlagBin, CAS}, State}
+	    end;
 	error ->
 	    {reply, not_found, State}
     end;
@@ -195,3 +200,17 @@ incr_binary_fun(Amount) ->
 	    IntAfter = IntBefore + Amount,
 	    integer_to_binary(IntAfter)
     end.
+
+expires_in(0) ->
+    infinity;
+expires_in(Delta) ->
+    now_int() + Delta*1000*1000.
+
+is_expired(infinity) ->
+    false;
+is_expired(Time) ->
+    now_int() > Time.
+
+now_int() ->
+    {Mega, Secs, Micro} = now(),
+    Mega*1000*1000*1000*1000 + Secs*1000*1000 + Micro.

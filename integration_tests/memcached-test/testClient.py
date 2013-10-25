@@ -277,5 +277,13 @@ class ComplianceTest(unittest.TestCase):
         time.sleep(2.1)
         self.assertNotExists('x')
 
+    def testExpiration(self):
+        val, cas, something=self.mc.set("x", 4, 19, "some")
+        self.assertGet((19, 'some'), self.mc.get("x"))
+        time.sleep(2)
+        self.assertGet((19, 'some'), self.mc.get("x"))
+        time.sleep(2.1)
+        self.assertNotExists('x')
+
 if __name__ == '__main__':
     unittest.main()

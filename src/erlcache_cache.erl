@@ -3,7 +3,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, set/5, add/5, replace/5, get/1, flush/0, delete/2, incr/4, append/3, prepend/3, stat/0]).
+-export([start_link/0, set/5, add/5, replace/5, get/1, flush/0, delete/2, incr/4, append/3, prepend/3, stat/0, touch/2]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -42,6 +42,8 @@ prepend(Key, Value, CAS) ->
     gen_server:call(?MODULE, {prepend, Key, Value, CAS}).
 stat() ->
     gen_server:call(?MODULE, {stat}).
+touch(Key, Expiration) ->
+    gen_server:call(?MODULE, {touch, Key, Expiration}).
 
 init([]) ->
     Stats = dict:new(),
@@ -178,6 +180,14 @@ handle_call({prepend, Key, Value, CAS}, _From, State) ->
     end;
 handle_call({stat}, _From, State) ->
     {reply, State#state.stats, State};
+handle_call({touch, Key, Expiration}, _From, State) ->
+    case dict:find(Key, State#state.kv) of
+	{ok, Item} ->
+	    NewKV = dict:store(Key, Item#item{expiration=expires_in(Expiration)}, State#state.kv),
+	    {reply, ok, State#state{kv=NewKV}};
+	error ->
+	    {reply, not_found, State}
+    end;
 handle_call(_Request, _From, State) ->
     Reply = fellthrough,
     {reply, Reply, State}.

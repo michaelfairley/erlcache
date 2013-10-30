@@ -29,6 +29,7 @@
 -define(FLUSHQ,      16#18).
 -define(APPENDQ,     16#19).
 -define(PREPENDQ,    16#1a).
+-define(TOUCH,       16#1c).
 -define(RGET,        16#30).
 -define(RSET,        16#31).
 -define(RSETQ,       16#32).

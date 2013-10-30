@@ -190,6 +190,13 @@ handle_command(?STAT, _Key, <<>>, <<>>, _CAS) ->
 		     [#response{status=?SUCCESS, key=atom_to_binary(Key, utf8), body=Value} | RespAcc]
 	     end, [#response{status=?SUCCESS}], Stats),
     {reply_many, Responses};
+handle_command(?TOUCH, Key, <<>>, <<Expiration:32>>, _CAS) ->
+    case erlcache_cache:touch(Key, Expiration) of
+	ok ->
+	    {reply, #response{status=?SUCCESS}};
+	not_found ->
+	    {reply, #response{status=?NOT_FOUND}}
+    end;
 handle_command(OpCode, _, _, _, _) ->
     io:format("No match: ~.16B~n", [OpCode]),
     {reply, #response{status=?UNKNOWN_COMMAND}}.
